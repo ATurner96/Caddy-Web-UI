@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Caddy Web Manager</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.33.0/min/vs/loader.min.js"></script>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+
+<body>
+    <div class="container mt-5">
+        <h1 class="page-title">Caddy Web Manager</h1>
+
+        
+        <form id="add-site-form" class="form-container">
+            <h2>Add a New Site</h2>
+            <div class="input-group mb-3">
+                <input type="text" class="form-control" placeholder="Domain (e.g., example.com)" id="domain" required>
+            </div>
+            <textarea id="config" class="form-control mb-3" rows="5" placeholder="Enter site configuration (e.g., reverse_proxy 127.0.0.1:8080)" required></textarea>
+            <button class="btn btn-primary" type="submit">Add Site</button>
+        </form>
+
+        
+        <button id="reload-caddy-btn" class="btn btn-warning mt-3">Reload Caddy</button>
+
+        
+        <h2 class="mt-5">Sites</h2>
+        <ul id="sites-list" class="list-group">
+            {% for site in sites %}
+            <li class="list-group-item">
+                <h4 class="site-domain">{{ site.domain }}</h4>
+                <pre class="site-config">{{ site.config | join('\n') }}</pre>
+                <button class="btn btn-primary edit-site-btn" data-domain="{{ site.domain }}" data-config="{{ site.config | join('\n') }}">Edit</button>
+                <button class="btn btn-danger delete-site-btn" data-domain="{{ site.domain }}">Delete</button>
+                {% if 'file_server' in site.config %}
+                <button class="btn btn-secondary upload-btn" data-domain="{{ site.domain }}">Manage Files</button>
+                {% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    
+    <div class="modal" id="editSiteModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit Site Configuration</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <textarea id="edit-config" class="form-control" rows="8"></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" id="save-site-config">Save</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    
+    <div class="modal" id="uploadModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Manage Files</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <nav class="breadcrumb">
+                        <ol id="breadcrumb" class="breadcrumb mb-0"></ol>
+                    </nav>
+
+                    <div class="file-explorer-header mb-3">
+                        <button class="btn btn-sm btn-outline-primary" id="upload-zip-btn">
+                            <i class="bi-upload"></i> Upload Zip
+                        </button>                        
+                        <input type="file" id="file-upload" class="form-control form-control-sm" multiple style="display: none;">
+                        <button class="btn btn-sm btn-outline-primary" id="upload-btn">
+                            <i class="bi-upload"></i> Upload File(s)
+                        </button>
+                        <input type="text" id="new-dir-name" class="form-control form-control-sm d-inline-block w-auto" placeholder="Folder Name">
+                        <button class="btn btn-sm btn-outline-secondary" id="create-dir-btn">
+                            <i class="bi-folder-plus"></i> New Folder
+                        </button>
+                    </div>                    
+
+                    <div id="file-explorer"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="deleteSiteModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Confirm Deletion</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to delete the site <strong id="site-to-delete"></strong>?</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-danger" id="confirm-delete-btn">Delete</button>
+                </div>
+            </div>
+        </div>
+    </div>    
+
+    
+    <div class="modal" id="editFileModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit File</h5>
+                    <div>
+                        <button type="button" class="btn btn-outline-secondary btn-sm me-2" id="fullscreen-btn">
+                            <i class="bi-arrows-fullscreen"></i> Fullscreen
+                        </button>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                </div>
+                <div class="modal-body" style="height: 500px; overflow: hidden;">
+                    <div id="monaco-editor" style="width: 100%; height: 100%;"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" id="save-file-btn">Save</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="context-menu">
+        
+    </div>    
+    
+
+
+
+    <script>
+        let currentPath = "";
+        let selectedFile = null;
+        let monacoEditor;
+        let editor;
+        let isFullscreen = false;
+        const fileItems = document.querySelectorAll(".file-item");
+
+        document.addEventListener("DOMContentLoaded", () => {
+            const fileExplorer = document.getElementById("file-explorer");
+            const contextMenu = document.querySelector(".context-menu");
+
+            fileExplorer.addEventListener("contextmenu", (event) => {
+                event.preventDefault();
+                const target = event.target.closest(".file-item");
+                contextMenu.innerHTML = "";
+
+                if (target) {
+                    const isDirectory = target.querySelector("i").classList.contains("bi-folder-fill");
+                    const fileName = target.querySelector(".file-name").textContent;
+                    const filePath = `${currentPath}/${fileName}`.replace(/\/+/g, "/");
+
+                    const renameOption = document.createElement("div");
+                    renameOption.classList.add("context-menu-item");
+                    renameOption.textContent = "Rename";
+                    renameOption.addEventListener("click", () => {
+                        const newName = prompt("Enter new name:", fileName);
+                        if (newName) {
+                            fetch(`/rename-file/${filePath}`, {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ new_name: newName }),
+                            })
+                                .then((response) => response.json())
+                                .then((data) => {
+                                    if (data.success) {
+                                        alert("File or folder renamed successfully!");
+                                        renderFileExplorer(currentPath.split("/")[0], currentPath.replace(`${currentPath.split("/")[0]}/`, ""));
+                                    } else {
+                                        alert(data.error || "Failed to rename file or folder.");
+                                    }
+                                })
+                                .catch((error) => console.error("Error renaming file or folder:", error));
+                        }
+                        contextMenu.style.display = "none";
+                    });
+                    contextMenu.appendChild(renameOption);
+
+                    const deleteOption = document.createElement("div");
+                    deleteOption.classList.add("context-menu-item");
+                    deleteOption.textContent = "Delete";
+                    deleteOption.addEventListener("click", () => {
+                        if (confirm(`Are you sure you want to delete ${fileName}?`)) {
+                            fetch(`/delete-file/${filePath}`, { method: "DELETE" })
+                                .then((response) => response.json())
+                                .then((data) => {
+                                    if (data.success) {
+                                        alert("File or folder deleted successfully!");
+                                        renderFileExplorer(currentPath.split("/")[0], currentPath.replace(`${currentPath.split("/")[0]}/`, ""));
+                                    } else {
+                                        alert(data.error || "Failed to delete file or folder.");
+                                    }
+                                })
+                                .catch((error) => console.error("Error deleting file or folder:", error));
+                        }
+                        contextMenu.style.display = "none";
+                    });
+                    contextMenu.appendChild(deleteOption);
+                } else {
+                    console.log("Right-clicked on blank space");
+
+                    const newFolderOption = document.createElement("div");
+                    newFolderOption.classList.add("context-menu-item");
+                    newFolderOption.textContent = "New Folder";
+                    newFolderOption.addEventListener("click", () => {
+                        createNewFolderUI();
+                        contextMenu.style.display = "none";
+                    });
+                    contextMenu.appendChild(newFolderOption);
+                }
+
+                const modalBody = document.querySelector("#uploadModal .modal-body");
+                modalBody.appendChild(contextMenu);
+
+                const modalRect = modalBody.getBoundingClientRect();
+                const top = event.clientY - modalRect.top + modalBody.scrollTop;
+                const left = event.clientX - modalRect.left + modalBody.scrollLeft;
+
+                contextMenu.style.top = `${top}px`;
+                contextMenu.style.left = `${left}px`;
+                contextMenu.style.display = "block";
+            });
+
+            document.addEventListener("click", () => {
+                contextMenu.style.display = "none";
+            });
+
+            const createNewFolderUI = () => {
+                const newFolderItem = document.createElement("div");
+                newFolderItem.classList.add("file-item", "d-flex", "align-items-center", "mb-2");
+
+                const icon = document.createElement("i");
+                icon.classList.add("bi-folder-fill");
+                icon.style.marginRight = "10px";
+                newFolderItem.appendChild(icon);
+
+                const nameInput = document.createElement("input");
+                nameInput.type = "text";
+                nameInput.placeholder = "New Folder";
+                nameInput.classList.add("form-control", "folder-name-input");
+                nameInput.style.flexGrow = "1";
+                newFolderItem.appendChild(nameInput);
+
+                fileExplorer.insertBefore(newFolderItem, fileExplorer.firstChild);
+                nameInput.focus();
+
+                const saveFolder = () => {
+                    const folderName = nameInput.value.trim();
+                    if (folderName) {
+                        fetch(`/create-dir/${currentPath}/${folderName}`, { method: "POST" })
+                            .then((response) => response.json())
+                            .then((data) => {
+                                if (data.success) {
+                                    renderFileExplorer(currentPath.split("/")[0], currentPath.replace(`${currentPath.split("/")[0]}/`, ""));
+                                } else {
+                                    alert(data.error || "Failed to create folder.");
+                                }
+                            })
+                            .catch((error) => console.error("Error creating folder:", error));
+                    } else {
+                        newFolderItem.remove();
+                    }
+                };
+
+                nameInput.addEventListener("blur", saveFolder);
+                nameInput.addEventListener("keydown", (event) => {
+                    if (event.key === "Enter") {
+                        saveFolder();
+                    } else if (event.key === "Escape") {
+                        newFolderItem.remove();
+                    }
+                });
+            };
+        });
+
+        document.getElementById("fullscreen-btn").addEventListener("click", () => {
+            const modalContent = document.querySelector("#editFileModal .modal-content");
+            const editorContainer = document.getElementById("monaco-editor");
+
+            if (!isFullscreen) {
+                modalContent.classList.add("fullscreen");
+                editorContainer.style.height = "100vh";
+                editorContainer.style.width = "100vw";
+                document.body.style.overflow = "hidden";
+                isFullscreen = true;
+            } else {
+                modalContent.classList.remove("fullscreen");
+                editorContainer.style.height = "500px";
+                editorContainer.style.width = "100%";
+                document.body.style.overflow = "auto";
+                isFullscreen = false;
+            }
+
+            if (editor) {
+                editor.layout();
+            }
+        });
+
+        document.getElementById("reload-caddy-btn").addEventListener("click", () => {
+            fetch("/reload-caddy", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" }
+            })
+            .then(response => response.json())
+            .then(data => alert(data.message || "Caddy reloaded successfully!"))
+            .catch(error => console.error("Error reloading Caddy:", error));
+        });
+
+
+        document.getElementById("add-site-form").addEventListener("submit", (e) => {
+            e.preventDefault();
+            const domain = document.getElementById("domain").value;
+            const config = document.getElementById("config").value.split("\n");
+
+            fetch("/add-site", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ domain, config }),
+            })
+            .then(response => response.json())
+            .then(() => location.reload())
+            .catch(error => console.error("Error adding site:", error));
+        });
+
+        document.querySelectorAll(".edit-site-btn").forEach(button => {
+            button.addEventListener("click", () => {
+                const domain = button.dataset.domain;
+                const config = button.dataset.config;
+
+                document.getElementById("edit-config").value = config;
+
+                document.getElementById("save-site-config").onclick = () => {
+                    const newConfig = document.getElementById("edit-config").value;
+                    fetch(`/edit-site`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ domain, config: newConfig }),
+                    }).then(() => location.reload())
+                      .catch(error => console.error("Error saving site configuration:", error));
+                };
+
+                const modal = new bootstrap.Modal(document.getElementById("editSiteModal"));
+                modal.show();
+            });
+        });
+
+        function openEditFileModal(domain, path) {
+    fetch(`/edit-file/${domain}${path}`)
+        .then((response) => response.json())
+        .then((data) => {
+            if (data.success) {
+                const content = data.content;
+                const filename = path.split('/').pop();
+
+                const modalElement = document.getElementById("editFileModal");
+                const modal = new bootstrap.Modal(modalElement);
+
+                modalElement.addEventListener("shown.bs.modal", () => {
+                    const editorContainer = document.getElementById("monaco-editor");
+                    if (!editorContainer) {
+                        console.error("Monaco container element not found.");
+                        return;
+                    }
+
+                    require.config({ paths: { vs: "https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.33.0/min/vs" } });
+                    require(["vs/editor/editor.main"], () => {
+                        initializeEditor(filename, content);
+                    });
+
+                    const saveButton = document.getElementById("save-file-btn");
+                    saveButton.onclick = () => {
+                        const newContent = monacoEditor.getValue();
+                        fetch(`/save-file/${domain}${path}`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ content: newContent }),
+                        })
+                            .then((response) => response.json())
+                            .then((data) => {
+                                if (data.success) {
+                                    modal.hide();
+                                    alert("File saved successfully!");
+                                } else {
+                                    alert(data.error || "Failed to save the file.");
+                                }
+                            })
+                            .catch((error) => console.error("Error saving file:", error));
+                    };
+                });
+
+                modal.show();
+            } else {
+                alert(data.error || "Failed to fetch file content.");
+            }
+        })
+        .catch((error) => console.error("Error fetching file content:", error));
+}
+
+function initializeEditor(filename, content = "") {
+    const determineLanguage = (filename) => {
+        const extension = filename.split(".").pop().toLowerCase();
+        switch (extension) {
+            case "html":
+                return "html";
+            case "css":
+                return "css";
+            case "js":
+            case "jsx":
+                return "javascript";
+            case "json":
+                return "json";
+            case "ts":
+            case "tsx":
+                return "typescript";
+            case "md":
+                return "markdown";
+            case "xml":
+                return "xml";
+            case "yml":
+            case "yaml":
+                return "yaml";
+            default:
+                return "plaintext";
+        }
+    };
+
+    const language = determineLanguage(filename);
+
+    const editorContainer = document.getElementById("monaco-editor");
+    if (!editorContainer) {
+        console.error("Monaco container element not found.");
+        return;
+    }
+
+    if (monacoEditor) {
+        monacoEditor.dispose();
+    }
+
+    monacoEditor = monaco.editor.create(editorContainer, {
+        value: content,
+        language: language,
+        theme: "vs-dark",
+        automaticLayout: true,
+    });
+
+    console.log(`Editor initialized for ${filename} with language: ${language}`);
+}
+
+
+
+        document.querySelectorAll(".upload-btn").forEach(button => {
+            button.addEventListener("click", () => {
+                const domain = button.dataset.domain;
+
+                renderFileExplorer(domain);
+
+                    document.getElementById("upload-zip-btn").onclick = () => {
+                        const fileInput = document.getElementById("file-upload");
+                        fileInput.accept = ".zip";
+                        fileInput.click();
+
+                        fileInput.onchange = () => {
+                            const files = fileInput.files;
+                            if (files.length === 0 || !files[0].name.endsWith(".zip")) {
+                                alert("Please select a valid ZIP file.");
+                                return;
+                            }
+
+                            const formData = new FormData();
+                            formData.append("zip", files[0]);
+
+                            const relativePath = currentPath.startsWith(`${domain}/`)
+                                ? currentPath.replace(`${domain}/`, "")
+                                : currentPath;
+
+                            fetch(`/upload-zip/${domain}/${relativePath}`, {
+                                method: "POST",
+                                body: formData,
+                            })
+                                .then(response => response.json())
+                                .then(data => {
+                                    if (data.success) {
+                                        alert("ZIP file uploaded and extracted successfully!");
+                                        renderFileExplorer(domain, relativePath);
+                                    } else {
+                                        alert(data.error || "Failed to upload ZIP file.");
+                                    }
+                                    fileInput.value = "";
+                                })
+                                .catch(error => console.error("Error uploading ZIP file:", error));
+                        };
+                    };
+
+                document.getElementById("upload-btn").onclick = () => {
+                    const fileInput = document.getElementById("file-upload");
+                    fileInput.click();
+
+                    fileInput.onchange = () => {
+                        const files = fileInput.files;
+                        const formData = new FormData();
+                        for (const file of files) {
+                            formData.append("files", file);
+                        }
+
+                        const relativePath = currentPath.startsWith(`${domain}/`)
+                            ? currentPath.replace(`${domain}/`, "")
+                            : currentPath;
+
+                        fetch(`/upload/${domain}/${relativePath}`, {
+                            method: "POST",
+                            body: formData,
+                        })
+                            .then(response => response.json())
+                            .then(data => {
+                                if (data.success) {
+                                    renderFileExplorer(domain, relativePath);
+                                } else {
+                                    alert(data.error || "Failed to upload files.");
+                                }
+                                fileInput.value = "";
+                            })
+                            .catch(error => console.error("Error uploading files:", error));
+                    };
+                };
+
+                document.getElementById("create-dir-btn").onclick = () => {
+                    const dirName = document.getElementById("new-dir-name").value.trim();
+
+                    if (!dirName) {
+                        alert("Folder name cannot be empty.");
+                        return;
+                    }
+
+                    const normalizedPath = `${domain}/${currentPath}/${dirName}`.replace(/\/\/+/g, "/");
+
+                    fetch(`/create-dir/${normalizedPath}`, { method: "POST" })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.success) {
+                                renderFileExplorer(domain, currentPath);
+                            } else {
+                                alert(data.error || "Failed to create directory.");
+                            }
+                        })
+                        .catch(error => console.error("Error creating directory:", error));
+                };
+
+                const modal = new bootstrap.Modal(document.getElementById("uploadModal"));
+                modal.show();
+            });
+        });
+
+
+        document.querySelectorAll(".delete-site-btn").forEach(button => {
+            button.addEventListener("click", () => {
+                const domain = button.dataset.domain;
+                document.getElementById("site-to-delete").textContent = domain;
+
+                const confirmDeleteBtn = document.getElementById("confirm-delete-btn");
+                confirmDeleteBtn.onclick = () => {
+                    fetch("/delete-site", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ domain }),
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            alert(data.message);
+                            location.reload();
+                        } else {
+                            alert(data.error || "Failed to delete site.");
+                        }
+                    })
+                    .catch(error => console.error("Error deleting site:", error));
+                };
+
+                const modal = new bootstrap.Modal(document.getElementById("deleteSiteModal"));
+                modal.show();
+            });
+        });
+
+
+        function renderFileExplorer(domain, path = "") {
+            const normalizedPath = path.startsWith(domain)
+                ? path.replace(`${domain}/`, "")
+                : path;
+
+            currentPath = `${domain}/${normalizedPath}`.replace(/\/\/+/g, "/");
+            console.log("Normalized renderFileExplorer path:", currentPath);
+
+            fetch(`/list-files/${currentPath}`)
+                .then(response => response.json())
+                .then(data => {
+                    const fileExplorer = document.getElementById("file-explorer");
+                    fileExplorer.innerHTML = "";
+
+                    const breadcrumb = document.getElementById("breadcrumb");
+                    breadcrumb.innerHTML = "";
+                    const pathParts = currentPath.split("/").slice(1);
+                    let accumulatedPath = domain;
+                    pathParts.forEach((part, index) => {
+                        accumulatedPath += `/${part}`;
+                        const breadcrumbItem = document.createElement("li");
+                        breadcrumbItem.classList.add("breadcrumb-item");
+                        if (index === pathParts.length - 1) {
+                            breadcrumbItem.textContent = part;
+                        } else {
+                            const link = document.createElement("a");
+                            link.href = "#";
+                            link.textContent = part;
+                            link.onclick = () => renderFileExplorer(domain, accumulatedPath.replace(`${domain}/`, ""));
+                            breadcrumbItem.appendChild(link);
+                        }
+                        breadcrumb.appendChild(breadcrumbItem);
+                    });
+
+                    if (pathParts.length > 0) {
+                        const folderUpItem = document.createElement("div");
+                        folderUpItem.classList.add("file-item", "d-flex", "align-items-center", "mb-2");
+
+                        const icon = document.createElement("i");
+                        icon.classList.add("bi-folder-fill");
+                        icon.style.marginRight = "10px";
+                        folderUpItem.appendChild(icon);
+
+                        const name = document.createElement("span");
+                        name.textContent = "...";
+                        name.classList.add("text-primary", "pointer", "file-name");
+                        name.style.flexGrow = "1";
+                        name.onclick = () => {
+                            const parentPath = pathParts.slice(0, -1).join("/");
+                            renderFileExplorer(domain, parentPath);
+                        };
+                        folderUpItem.appendChild(name);
+
+                        fileExplorer.appendChild(folderUpItem);
+                    }
+
+                    if (data.success) {
+                        data.files.forEach(file => {
+                            const item = document.createElement("div");
+                            item.classList.add("file-item", "d-flex", "align-items-center", "mb-2");
+
+                            const icon = document.createElement("i");
+                            icon.classList.add(file.type === "directory" ? "bi-folder-fill" : "bi-file-earmark");
+                            icon.style.marginRight = "10px";
+                            item.appendChild(icon);
+
+                            const name = document.createElement("span");
+                            name.textContent = file.name;
+                            name.classList.add("file-name");
+                            if (file.type === "directory") {
+                                name.classList.add("text-primary", "pointer");
+                                name.onclick = () => renderFileExplorer(domain, `${path}/${file.name}`);
+                            }
+                            name.style.flexGrow = "1";
+                            item.appendChild(name);
+
+                            if (file.type === "file") {
+                                const editBtn = document.createElement("button");
+                                editBtn.textContent = "Edit";
+                                editBtn.classList.add("btn", "btn-sm", "btn-outline-info", "me-2");
+                                editBtn.onclick = () => openEditFileModal(domain, `${path}/${file.name}`);
+                                item.appendChild(editBtn);
+                            }
+
+                            const deleteBtn = document.createElement("button");
+                            deleteBtn.textContent = "Delete";
+                            deleteBtn.classList.add("btn", "btn-sm", "btn-danger", "ms-auto");
+                            deleteBtn.onclick = () => {
+                                const normalizedPath = `${domain}/${path}/${file.name}`
+                                    .replace(/\/+/g, "/")
+                                    .replace(`${domain}/${domain}`, domain);
+
+                                console.log("Normalized delete path:", normalizedPath);
+
+                                fetch(`/delete-file/${normalizedPath}`, { method: "DELETE" })
+                                    .then(response => response.json())
+                                    .then(data => {
+                                        if (data.success) {
+                                            renderFileExplorer(domain, path);
+                                        } else {
+                                            alert(data.error || "Failed to delete file.");
+                                        }
+                                    })
+                                    .catch(error => console.error("Error deleting file:", error));
+                            };
+
+                            item.appendChild(deleteBtn);
+
+                            fileExplorer.appendChild(item);
+                        });
+                    } else {
+                        alert(data.error || "Failed to fetch files.");
+                    }
+                })
+                .catch(error => console.error("Error loading files:", error));
+        }
+
+
+
+
+        document.addEventListener("DOMContentLoaded", () => {
+            const fileItems = document.querySelectorAll(".file-item");
+            console.log("File items found:", fileItems);
+
+            fileItems.forEach(item => {
+                console.log("File item:", item);
+            });
+        });
+
+    </script>
+</body>
+</html>

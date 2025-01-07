@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Setup</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/static/styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.33.0/min/vs/loader.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <form id="setup-form" class="form-container">
+            <h1>Setup</h1>
+            <p>Create the first admin user and configure optional settings:</p>
+            <h2>Admin Account</h2>
+            <div class="mb-3">
+                <label for="username" class="form-label">Username</label>
+                <input type="text" class="form-control" id="username" required>
+            </div>
+            <div class="mb-3">
+                <label for="password" class="form-label">Password</label>
+                <input type="password" class="form-control" id="password" required>
+            </div>
+
+            <h2>Configuration Settings</h2>
+            <div class="mb-3">
+                <label for="base_dir" class="form-label">Base Directory (Optional)</label>
+                <input type="text" class="form-control" id="base_dir" placeholder="/var/www/caddy-web-ui">
+                <small class="form-text text-muted">The directory where the application is installed. Leave blank to use the default installation path.</small>
+            </div>
+            <div class="mb-3">
+                <label for="caddyfile" class="form-label">Caddyfile Path</label>
+                <input type="text" class="form-control" id="caddyfile" placeholder="/etc/caddy/Caddyfile">
+                <small class="form-text text-muted">The full path to your Caddyfile configuration file.</small>
+            </div>
+            <div class="mb-3">
+                <label for="port" class="form-label">Port</label>
+                <input type="number" class="form-control" id="port" placeholder="5154">
+                <small class="form-text text-muted">The port number for the web interface. Default: 5154.</small>
+            </div>
+            <div class="mb-3">
+                <label for="secret_key" class="form-label">Secret Key</label>
+                <div class="input-group">
+                    <input type="text" class="form-control" id="secret_key" placeholder="Generate a secure key or provide your own">
+                    <button type="button" id="generate-key-btn" class="btn btn-secondary">Generate Key</button>
+                    <button type="button" id="copy-key-btn" class="btn btn-outline-primary">Copy</button>
+                </div>
+                <small class="form-text text-muted">Used for cryptographic purposes (e.g., session security). Generate a random key or provide your own.</small>
+            </div>
+
+            <button type="submit" class="btn btn-primary">Save Configuration</button>
+        </form>
+    </div>
+
+    <script>
+        document.getElementById("generate-key-btn").addEventListener("click", () => {
+            const key = [...Array(32)]
+                .map(() => Math.random().toString(36).charAt(2))
+                .join('');
+            document.getElementById("secret_key").value = key;
+        });
+
+        document.getElementById("copy-key-btn").addEventListener("click", () => {
+            const secretKeyInput = document.getElementById("secret_key");
+            secretKeyInput.select();
+            document.execCommand("copy");
+            alert("Secret Key copied to clipboard!");
+        });
+
+        document.getElementById("setup-form").addEventListener("submit", (e) => {
+            e.preventDefault();
+            const username = document.getElementById("username").value;
+            const password = document.getElementById("password").value;
+            const base_dir = document.getElementById("base_dir").value || null;
+            const caddyfile = document.getElementById("caddyfile").value || null;
+            const port = parseInt(document.getElementById("port").value) || null;
+            const secret_key = document.getElementById("secret_key").value;
+
+            fetch("/setup", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ username, password, base_dir, caddyfile, port, secret_key }),
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert("Setup completed successfully!");
+                        window.location.reload();
+                    } else {
+                        alert(`Error: ${data.error}`);
+                    }
+                });
+        });
+    </script>
+</body>
+</html>

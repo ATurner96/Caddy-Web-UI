@@ -1,0 +1,7 @@
+{
+    "base_dir": "/var/www/caddy-web-ui",
+    "caddyfile": "/etc/caddy/Caddyfile",
+    "port": 5154,
+    "secret_key": "your_secure_random_key_here",
+    "first_run": true
+}
