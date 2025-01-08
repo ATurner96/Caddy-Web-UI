@@ -81,7 +81,6 @@
 
         function renderRootFileExplorer(path = null) {
             const normalisedPath = path ? normalisePath(path) : "/";
-            console.log("Normalised path to render:", normalisedPath);
             const url = normalisedPath ? `/list-root-directories?path=${encodeURIComponent(normalisedPath)}` : "/list-root-directories";
 
             fetch(url)
@@ -128,10 +127,11 @@
                             name.style.flexGrow = "1";
                             name.onclick = () => {
                                 if (file.type === "directory") {
-                                    const nextPath = normalisePath(`${normalisedPath}/${file.name}`);
-                                    renderRootFileExplorer(nextPath);
+                                    selectedPath = normalisePath(`${normalisedPath}/${file.name}`);
+                                    renderRootFileExplorer(selectedPath);
                                 } else {
-                                    console.log("File selected:", file.name);
+                                    selectedPath = normalisePath(`${normalisedPath}/${file.name}`);
+                                    console.log("File selected:", selectedPath); // Debugging
                                 }
                             };
                             item.appendChild(name);
@@ -145,19 +145,20 @@
                 .catch(error => console.error("Error fetching files:", error));
         }
 
-
         document.getElementById("browse-base-dir-btn").addEventListener("click", () => {
             currentPath = null;
             selectedPath = "";
             renderRootFileExplorer(currentPath);
+
             document.getElementById("select-btn").onclick = () => {
                 if (selectedPath) {
-                    document.getElementById("base_dir").value = normalisePath(selectedPath);
+                    document.getElementById("base_dir").value = selectedPath; // Use the updated selectedPath
                 } else {
                     alert("Please select a directory.");
                 }
                 bootstrap.Modal.getInstance(document.getElementById("fileManagerModal")).hide();
             };
+
             new bootstrap.Modal(document.getElementById("fileManagerModal")).show();
         });
 
@@ -165,19 +166,18 @@
             currentPath = null;
             selectedPath = "";
             renderRootFileExplorer(currentPath);
+
             document.getElementById("select-btn").onclick = () => {
                 if (selectedPath) {
-                    document.getElementById("caddyfile").value = normalisePath(selectedPath);
+                    document.getElementById("caddyfile").value = selectedPath; // Use the updated selectedPath
                 } else {
                     alert("Please select a file.");
                 }
                 bootstrap.Modal.getInstance(document.getElementById("fileManagerModal")).hide();
             };
+
             new bootstrap.Modal(document.getElementById("fileManagerModal")).show();
         });
-
-
-
 
         document.getElementById("config-form").addEventListener("submit", (e) => {
             e.preventDefault();
