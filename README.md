@@ -8,7 +8,6 @@ Caddy Web UI is a user-friendly interface for managing Caddy server configuratio
 - File management with uploads, deletions, and ZIP extraction.
 - Reload Caddy server configurations.
 - User authentication and session management.
-- Dynamic context menu for file explorer.
 
 ## Prerequisites
 - Python 3.8 or higher
