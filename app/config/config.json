@@ -2,5 +2,5 @@
     "base_dir": "D:\\Caddy Web UI\\Caddy Web UI - Setup",
     "caddyfile": "C:\\Caddy\\Caddyfile",
     "port": 5154,
-    "first_run": false
+    "first_run": true
 }
