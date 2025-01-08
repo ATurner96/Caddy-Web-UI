@@ -71,8 +71,16 @@
         let selectedPath = "";
 
         function normalisePath(path) {
-            return path.replace(/\\/g, '/').replace(/\/+/g, '/').replace(/\/$/, '');
+            console.log("Input path:", path);
+            if (!path || typeof path !== "string") {
+                console.error("Invalid path input to normalisePath:", path);
+                return ""; // Fallback to empty string for invalid input
+            }
+            const normalised = path.replace(/\\/g, '/').replace(/\/+/g, '/').replace(/\/$/, '');
+            console.log("Normalised path:", normalised);
+            return normalised;
         }
+
 
         function renderRootFileExplorer(path = null) {
             const normalisedPath = path ? normalisePath(path) : null;
