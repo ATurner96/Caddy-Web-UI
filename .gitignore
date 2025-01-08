@@ -1,0 +1,33 @@
+# Ignore Python bytecode and cache directories
+__pycache__/
+*.py[cod]
+
+# Ignore environment-specific configuration and temporary files
+*.env
+*.venv
+env/
+venv/
+ENV/
+.VENV/
+
+# Ignore OS-specific and IDE-related files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Ignore log files and other temporary files
+*.log
+*.tmp
+*.bak
+*.old
+
+# Ignore compiled files
+*.so
+*.pyd
+
+# Ignore application-specific data
+*.sqlite3
+*.db

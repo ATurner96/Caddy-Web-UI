@@ -2,13 +2,35 @@ import os
 import json
 import bcrypt
 import zipfile
-from flask import request, jsonify, render_template, redirect, session, send_from_directory, Response
+from flask import request, jsonify, render_template, redirect, session, send_from_directory
 from app.utils import parse_caddyfile, update_caddyfile
 from functools import wraps
 import shutil
+import secrets  # For generating a secure secret key
+import app
+import platform
+
 
 USERS_FILE = os.path.join("app", "config", "users.json")
+CONFIG_FILE = os.path.join("app", "config", "config.json")
 UPLOAD_DIR = "/var/www/caddy-sites"
+
+# Load the configuration
+if not os.path.exists(CONFIG_FILE):
+    with open(CONFIG_FILE, "w") as file:
+        json.dump({"first_run": True}, file)
+
+with open(CONFIG_FILE) as file:
+    config = json.load(file)
+
+# Generate a secure session key if not already set
+if "secret_key" not in config:
+    config["secret_key"] = secrets.token_hex(32)
+    with open(CONFIG_FILE, "w") as file:
+        json.dump(config, file, indent=4)
+
+# Flask app secret key
+app.secret_key = config["secret_key"]
 
 def load_users():
     """Load users from the JSON file."""
@@ -25,7 +47,6 @@ def save_users(users):
 users = load_users()
 
 def login_required(view):
-    """Decorator to enforce login on routes."""
     @wraps(view)
     def wrapped_view(**kwargs):
         if "username" not in session:
@@ -41,62 +62,99 @@ def create_routes(app):
     BASE_DIR = config["base_dir"]
     CADDYFILE = config["caddyfile"]
 
+    @app.before_request
+    def check_first_run():
+        """Redirect to setup page if first_run is True."""
+        print(f"Request Endpoint: {request.endpoint}")
+        print(f"Request Path: {request.path}")
+        print(f"First Run: {config.get('first_run', True)}")
+        print(f"Session Username: {session.get('username')}")
+
+        if config.get("first_run", True):
+            # Allow specific endpoints during setup
+            allowed_endpoints = {"setup", "static", "list-root-directories"}
+            if request.endpoint not in allowed_endpoints:
+                # Allow authenticated users to access other endpoints
+                if "username" not in session:
+                    print("Redirecting to /setup")
+                    return redirect("/setup")
+            return  # Prevent further processing for allowed endpoints
+
+        # Enforce login for all other routes after setup
+        if "username" not in session and request.endpoint not in {"login", "static", "list-root-directories"}:
+            print("Redirecting to /login")
+            return redirect("/login")
+
+
+
+
+
     def update_config(key, value):
         """Helper function to update the config file."""
         config[key] = value
         with open(config_path, "w") as config_file:
             json.dump(config, config_file, indent=4)
 
+    # Setup Route
     @app.route("/setup", methods=["GET", "POST"])
     def setup():
         """Initial setup to create the first user and configure settings."""
-        if request.method == "POST":
-            data = request.json
-            username = data.get("username")
-            password = data.get("password")
-            base_dir = data.get("base_dir") or config.get("base_dir", "/var/www/caddy-web-ui")
-            caddyfile = data.get("caddyfile") or config.get("caddyfile", "/etc/caddy/Caddyfile")
-            port = data.get("port") or config.get("port", "5154")
-            secret_key = data.get("secret_key") or config.get("secret_key", "default_fallback_key")
+        # Stage 1: Create Admin User
+        if not users:
+            if request.method == "POST":
+                data = request.json
+                username = data.get("username")
+                password = data.get("password")
 
-            if not username or not password or not caddyfile or not port:
-                return jsonify({"success": False, "error": "Username, password, Caddyfile, and port are required"}), 400
+                if not username or not password:
+                    return jsonify({"success": False, "error": "Username and password are required"}), 400
 
-            hashed_password = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
-            users[username] = hashed_password
-            save_users(users)
+                # Hash the password and save the user
+                hashed_password = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+                users[username] = hashed_password
+                save_users(users)
 
-            config.update({
-                "base_dir": base_dir,
-                "caddyfile": caddyfile,
-                "port": port,
-                "secret_key": secret_key,
-                "first_run": False,
-            })
+                # Create session for the user
+                session["username"] = username
+                return jsonify({"success": True, "message": "User created successfully. Session started."})
 
-            with open(config_path, "w") as config_file:
-                json.dump(config, config_file, indent=4)
+            return render_template("setup_user.html")
 
-            return jsonify({"success": True, "message": "Setup completed successfully!"})
+        # Stage 2: Configure Settings
+        if config.get("first_run", True):
+            if request.method == "POST":
+                data = request.json
+                base_dir = data.get("base_dir") or (r"C:\Caddy" if platform.system() == "Windows" else "/var/www/caddy-web-ui")
+                caddyfile = data.get("caddyfile") or (r"C:\Caddy\Caddyfile" if platform.system() == "Windows" else "/etc/caddy/Caddyfile")
+                port = data.get("port") or 5154
 
-        if users:
-            return redirect("/login")
+                # Normalize paths
+                base_dir = os.path.normpath(base_dir)
+                caddyfile = os.path.normpath(caddyfile)
 
-        return render_template("setup.html")
+                # Validate paths
+                if not os.path.exists(base_dir):
+                    return jsonify({"success": False, "error": f"Base directory '{base_dir}' does not exist."}), 400
+                if not os.path.isfile(caddyfile):
+                    return jsonify({"success": False, "error": f"Caddyfile '{caddyfile}' does not exist."}), 400
 
+                # Update configuration
+                config.update({
+                    "base_dir": base_dir,
+                    "caddyfile": caddyfile,
+                    "port": int(port),
+                    "first_run": False,
+                })
 
+                with open(CONFIG_FILE, "w") as file:
+                    json.dump(config, file, indent=4)
 
+                return jsonify({"success": True, "message": "Configuration saved successfully. Setup complete."})
 
-    @app.before_request
-    def check_first_run():
-        """Redirect to setup page if first_run is True."""
-        if request.path.startswith('/static'):
-            return
+            return render_template("setup_config.html")
 
-        if config.get("first_run", True) and request.endpoint != "setup":
-            return redirect("/setup")
-
-
+        # If setup is complete, redirect to home
+        return redirect("/")
 
     @app.route("/login", methods=["GET", "POST"])
     def login():
@@ -375,6 +433,40 @@ def create_routes(app):
                 })
 
             return jsonify({"success": True, "files": items})
+        except Exception as e:
+            return jsonify({"success": False, "error": str(e)}), 500
+        
+    @app.route("/list-root-directories", methods=["GET"])
+    @login_required
+    def list_root_directories():
+        """List root directories or the contents of a given path."""
+        root_path = request.args.get("path", None)
+
+        try:
+            if root_path:
+                # List contents of the provided directory
+                if not os.path.exists(root_path):
+                    return jsonify({"success": False, "error": f"Path '{root_path}' does not exist"}), 404
+                
+                items = []
+                for entry in os.scandir(root_path):
+                    items.append({
+                        "name": entry.name,
+                        "type": "directory" if entry.is_dir() else "file",
+                        "size": os.path.getsize(entry) if entry.is_file() else "-",
+                        "modified": os.path.getmtime(entry),
+                    })
+
+                return jsonify({"success": True, "path": root_path, "files": items})
+            else:
+                # List root directories
+                if platform.system() == "Windows":
+                    # On Windows, root directories are the drives
+                    drives = [f"{chr(d)}:\\" for d in range(65, 91) if os.path.exists(f"{chr(d)}:\\")]
+                    return jsonify({"success": True, "path": "root", "files": [{"name": drive, "type": "directory"} for drive in drives]})
+                else:
+                    # On Unix-like systems, the root directory is "/"
+                    return jsonify({"success": True, "path": "root", "files": [{"name": "/", "type": "directory"}]})
         except Exception as e:
             return jsonify({"success": False, "error": str(e)}), 500
 

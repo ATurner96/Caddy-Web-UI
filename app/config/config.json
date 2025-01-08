@@ -1,7 +1,7 @@
 {
-    "base_dir": "/var/www/caddy-web-ui",
-    "caddyfile": "/etc/caddy/Caddyfile",
+    "base_dir": "D:\\Caddy Web UI\\Caddy Web UI - Setup",
+    "caddyfile": "C:\\Caddy\\Caddyfile",
     "port": 5154,
-    "secret_key": "your_secure_random_key_here",
-    "first_run": true
+    "first_run": false,
+    "secret_key": "dc6bedeba07f4df82bdad072725c049ec8c77451831ea7cba5bfb649024a608f"
 }

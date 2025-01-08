@@ -5,62 +5,144 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Setup</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
-    <link rel="stylesheet" href="/static/styles.css">
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.min.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.33.0/min/vs/loader.min.js"></script>
+    <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
-    <div class="container">
-        <form id="setup-form" class="form-container">
-            <h1>Setup</h1>
-            <p>Create the first admin user and configure optional settings:</p>
-            <h2>Admin Account</h2>
-            <div class="mb-3">
-                <label for="username" class="form-label">Username</label>
-                <input type="text" class="form-control" id="username" required>
-            </div>
-            <div class="mb-3">
-                <label for="password" class="form-label">Password</label>
-                <input type="password" class="form-control" id="password" required>
-            </div>
-
-            <h2>Configuration Settings</h2>
-            <div class="mb-3">
-                <label for="base_dir" class="form-label">Base Directory (Optional)</label>
-                <input type="text" class="form-control" id="base_dir" placeholder="/var/www/caddy-web-ui">
-                <small class="form-text text-muted">The directory where the application is installed. Leave blank to use the default installation path.</small>
-            </div>
-            <div class="mb-3">
-                <label for="caddyfile" class="form-label">Caddyfile Path</label>
-                <input type="text" class="form-control" id="caddyfile" placeholder="/etc/caddy/Caddyfile">
-                <small class="form-text text-muted">The full path to your Caddyfile configuration file.</small>
-            </div>
-            <div class="mb-3">
-                <label for="port" class="form-label">Port</label>
-                <input type="number" class="form-control" id="port" placeholder="5154">
-                <small class="form-text text-muted">The port number for the web interface. Default: 5154.</small>
-            </div>
-            <div class="mb-3">
-                <label for="secret_key" class="form-label">Secret Key</label>
-                <div class="input-group">
-                    <input type="text" class="form-control" id="secret_key" placeholder="Generate a secure key or provide your own">
-                    <button type="button" id="generate-key-btn" class="btn btn-secondary">Generate Key</button>
-                    <button type="button" id="copy-key-btn" class="btn btn-outline-primary">Copy</button>
+    <div class="container setup">
+        <!-- Stage 1: Create Admin Account -->
+        <div id="stage-create-account" class="setup-stage">
+            <h1>Create Admin Account</h1>
+            <form id="create-account-form" class="form-container">
+                <div class="mb-3">
+                    <label for="username" class="form-label">Username</label>
+                    <input type="text" class="form-control" id="username" required>
                 </div>
-                <small class="form-text text-muted">Used for cryptographic purposes (e.g., session security). Generate a random key or provide your own.</small>
-            </div>
+                <div class="mb-3">
+                    <label for="password" class="form-label">Password</label>
+                    <input type="password" class="form-control" id="password" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Create Account</button>
+            </form>
+        </div>
 
-            <button type="submit" class="btn btn-primary">Save Configuration</button>
-        </form>
+        <!-- Stage 2: Configuration Settings -->
+        <div id="stage-configure-settings" class="setup-stage" style="display: none;">
+            <h1>Configuration Settings</h1>
+            <form id="configure-settings-form" class="form-container">
+                <div class="mb-3">
+                    <label for="base_dir" class="form-label">Base Directory</label>
+                    <div class="input-group">
+                        <input type="text" class="form-control" id="base_dir" placeholder="/var/www/caddy-web-ui" readonly>
+                        <button type="button" id="browse-base-dir-btn" class="btn btn-outline-secondary">Browse</button>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label for="caddyfile" class="form-label">Caddyfile Path</label>
+                    <div class="input-group">
+                        <input type="text" class="form-control" id="caddyfile" placeholder="/etc/caddy/Caddyfile" readonly>
+                        <button type="button" id="browse-caddyfile-btn" class="btn btn-outline-secondary">Browse</button>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label for="port" class="form-label">Port</label>
+                    <input type="number" class="form-control" id="port" placeholder="5154">
+                </div>
+                <div class="mb-3">
+                    <label for="secret_key" class="form-label">Secret Key</label>
+                    <div class="input-group">
+                        <input type="text" class="form-control" id="secret_key" placeholder="Generate a secure key or provide your own">
+                        <button type="button" id="generate-key-btn" class="btn btn-secondary">Generate Key</button>
+                        <button type="button" id="copy-key-btn" class="btn btn-outline-primary">Copy</button>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary">Save Configuration</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- File Manager Modal -->
+    <div class="modal" id="fileManagerModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">File Manager</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <nav class="breadcrumb">
+                        <ol id="breadcrumb" class="breadcrumb mb-0"></ol>
+                    </nav>
+                    <div id="file-explorer" class="file-explorer"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" id="select-btn">Select</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
+        // Handle Stage Transitions
+        const showStage = (stageId) => {
+            document.querySelectorAll(".setup-stage").forEach(stage => {
+                stage.style.display = "none";
+            });
+            document.getElementById(stageId).style.display = "block";
+        };
+
+        // Stage 1: Create Account
+        document.getElementById("create-account-form").addEventListener("submit", (e) => {
+            e.preventDefault();
+            const username = document.getElementById("username").value;
+            const password = document.getElementById("password").value;
+
+            fetch("/setup/create-account", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ username, password }),
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert("Account created successfully.");
+                        showStage("stage-configure-settings");
+                    } else {
+                        alert(data.error || "Failed to create account.");
+                    }
+                });
+        });
+
+        // Stage 2: Configuration Settings
+        document.getElementById("configure-settings-form").addEventListener("submit", (e) => {
+            e.preventDefault();
+            const baseDir = document.getElementById("base_dir").value || null;
+            const caddyfile = document.getElementById("caddyfile").value || null;
+            const port = document.getElementById("port").value || 5154;
+            const secretKey = document.getElementById("secret_key").value || null;
+
+            fetch("/setup/save-config", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ base_dir: baseDir, caddyfile, port, secret_key: secretKey }),
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert("Configuration saved successfully.");
+                        window.location.reload();
+                    } else {
+                        alert(data.error || "Failed to save configuration.");
+                    }
+                });
+        });
+
+        // Generate and Copy Secret Key
         document.getElementById("generate-key-btn").addEventListener("click", () => {
-            const key = [...Array(32)]
-                .map(() => Math.random().toString(36).charAt(2))
-                .join('');
+            const key = [...Array(32)].map(() => Math.random().toString(36).charAt(2)).join('');
             document.getElementById("secret_key").value = key;
         });
 
@@ -71,29 +153,90 @@
             alert("Secret Key copied to clipboard!");
         });
 
-        document.getElementById("setup-form").addEventListener("submit", (e) => {
-            e.preventDefault();
-            const username = document.getElementById("username").value;
-            const password = document.getElementById("password").value;
-            const base_dir = document.getElementById("base_dir").value || null;
-            const caddyfile = document.getElementById("caddyfile").value || null;
-            const port = parseInt(document.getElementById("port").value) || null;
-            const secret_key = document.getElementById("secret_key").value;
+        // File Manager Integration
+        let currentPath = "/";
+        let selectedPath = "";
 
-            fetch("/setup", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ username, password, base_dir, caddyfile, port, secret_key }),
-            })
+        function renderFileExplorer(path) {
+            fetch(`/list-files/${path}`)
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        alert("Setup completed successfully!");
-                        window.location.reload();
+                        const fileExplorer = document.getElementById("file-explorer");
+                        const breadcrumb = document.getElementById("breadcrumb");
+                        fileExplorer.innerHTML = "";
+                        breadcrumb.innerHTML = "";
+
+                        // Breadcrumb Navigation
+                        const pathParts = path.split("/");
+                        let accumulatedPath = "";
+                        pathParts.forEach((part, index) => {
+                            accumulatedPath += part ? `/${part}` : "/";
+                            const breadcrumbItem = document.createElement("li");
+                            breadcrumbItem.classList.add("breadcrumb-item");
+                            if (index === pathParts.length - 1) {
+                                breadcrumbItem.textContent = part || "Root";
+                            } else {
+                                const link = document.createElement("a");
+                                link.href = "#";
+                                link.textContent = part || "Root";
+                                link.onclick = () => renderFileExplorer(accumulatedPath);
+                                breadcrumbItem.appendChild(link);
+                            }
+                            breadcrumb.appendChild(breadcrumbItem);
+                        });
+
+                        // File Listing
+                        data.files.forEach(file => {
+                            const item = document.createElement("div");
+                            item.classList.add("file-item", "d-flex", "align-items-center", "mb-2");
+
+                            const icon = document.createElement("i");
+                            icon.classList.add(file.type === "directory" ? "bi-folder-fill" : "bi-file-earmark");
+                            icon.style.marginRight = "10px";
+                            item.appendChild(icon);
+
+                            const name = document.createElement("span");
+                            name.textContent = file.name;
+                            name.style.flexGrow = "1";
+                            name.onclick = () => {
+                                if (file.type === "directory") {
+                                    renderFileExplorer(`${path}/${file.name}`);
+                                } else {
+                                    selectedPath = `${path}/${file.name}`;
+                                }
+                            };
+                            item.appendChild(name);
+
+                            fileExplorer.appendChild(item);
+                        });
                     } else {
-                        alert(`Error: ${data.error}`);
+                        alert(data.error || "Failed to load files.");
                     }
-                });
+                })
+                .catch(error => console.error("Error fetching files:", error));
+        }
+
+        document.getElementById("browse-base-dir-btn").addEventListener("click", () => {
+            currentPath = "/";
+            selectedPath = "";
+            renderFileExplorer(currentPath);
+            document.getElementById("select-btn").onclick = () => {
+                document.getElementById("base_dir").value = currentPath;
+                bootstrap.Modal.getInstance(document.getElementById("fileManagerModal")).hide();
+            };
+            new bootstrap.Modal(document.getElementById("fileManagerModal")).show();
+        });
+
+        document.getElementById("browse-caddyfile-btn").addEventListener("click", () => {
+            currentPath = "/";
+            selectedPath = "";
+            renderFileExplorer(currentPath);
+            document.getElementById("select-btn").onclick = () => {
+                document.getElementById("caddyfile").value = selectedPath;
+                bootstrap.Modal.getInstance(document.getElementById("fileManagerModal")).hide();
+            };
+            new bootstrap.Modal(document.getElementById("fileManagerModal")).show();
         });
     </script>
 </body>

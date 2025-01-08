@@ -31,8 +31,17 @@ input:-webkit-autofill {
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.5);
 }
 
-h1, h2, h3, h4, h5 {
+h1, h2, h3, h4, h5, p {
     color: #d4d4d4;
+}
+
+.form-text, .text-muted, .form-label {
+    color: #d4d4d4;
+}
+
+body {
+    padding: 20px;
+    height: 100%;
 }
 
 .form-container {
