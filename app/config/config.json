@@ -2,6 +2,5 @@
     "base_dir": "D:\\Caddy Web UI\\Caddy Web UI - Setup",
     "caddyfile": "C:\\Caddy\\Caddyfile",
     "port": 5154,
-    "first_run": false,
-    "secret_key": "dc6bedeba07f4df82bdad072725c049ec8c77451831ea7cba5bfb649024a608f"
+    "first_run": false
 }
