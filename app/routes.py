@@ -29,6 +29,24 @@ if "secret_key" not in config:
 
 app.secret_key = config["secret_key"]
 
+def reload_config():
+    """Reload configuration from file."""
+    global config, CADDYFILE
+    with open(CONFIG_FILE) as file:
+        config = json.load(file)
+    CADDYFILE = config.get("caddyfile", "")
+
+@app.before_request
+def before_request():
+    """Ensure config is loaded before each request."""
+    reload_config()
+    if config.get("first_run", True):
+        allowed_endpoints = {"setup", "static", "list-root-directories"}
+        if request.endpoint not in allowed_endpoints:
+            return redirect("/setup")
+    elif "username" not in session and request.endpoint not in {"login", "static", "list-root-directories"}:
+        return redirect("/login")
+
 def load_users():
     """Load users from the JSON file."""
     if not os.path.exists(USERS_FILE):
