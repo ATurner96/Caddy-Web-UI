@@ -21,16 +21,32 @@ def reload_config():
         config = json.load(file)
     CADDYFILE = config.get("caddyfile", "")
 
-@app.before_request
-def before_request():
-    """Ensure config is loaded before each request."""
-    reload_config()
-    if config.get("first_run", True):
-        allowed_endpoints = {"setup", "static", "list-root-directories"}
-        if request.endpoint not in allowed_endpoints:
-            return redirect("/setup")
-    elif "username" not in session and request.endpoint not in {"login", "static", "list-root-directories"}:
-        return redirect("/login")
+def create_app():
+    app = Flask(__name__)
+
+    # Load initial config
+    with open(CONFIG_FILE) as file:
+        config = json.load(file)
+    
+    app.secret_key = config.get("secret_key", secrets.token_hex(32))
+    app.config['CADDYFILE'] = config.get("caddyfile", "")
+
+    @app.before_request
+    def before_request():
+        with open(CONFIG_FILE) as file:
+            current_config = json.load(file)
+            app.config['CADDYFILE'] = current_config.get("caddyfile", "")
+
+        if current_config.get("first_run", True):
+            allowed_endpoints = {"setup", "static", "list-root-directories"}
+            if request.endpoint not in allowed_endpoints:
+                return redirect("/setup")
+        elif "username" not in session and request.endpoint not in {"login", "static", "list-root-directories"}:
+            return redirect("/login")
+
+    return app
+
+app = create_app()
 
 if not os.path.exists(CONFIG_FILE):
     with open(CONFIG_FILE, "w") as file:
