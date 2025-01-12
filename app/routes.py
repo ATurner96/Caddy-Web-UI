@@ -100,7 +100,6 @@ def create_routes(app):
 
     @app.route("/setup", methods=["GET", "POST"])
     def setup():
-        """Initial setup to create the first user and configure settings."""
         if not users:
             if request.method == "POST":
                 data = request.json
@@ -122,20 +121,15 @@ def create_routes(app):
         if config.get("first_run", True):
             if request.method == "POST":
                 data = request.json
-                base_dir = data.get("base_dir") or (r"C:\Caddy" if platform.system() == "Windows" else "/var/www/caddy-web-ui")
                 caddyfile = data.get("caddyfile") or (r"C:\Caddy\Caddyfile" if platform.system() == "Windows" else "/etc/caddy/Caddyfile")
                 port = data.get("port") or 5154
 
-                base_dir = os.path.normpath(base_dir)
                 caddyfile = os.path.normpath(caddyfile)
 
-                if not os.path.exists(base_dir):
-                    return jsonify({"success": False, "error": f"Base directory '{base_dir}' does not exist."}), 400
                 if not os.path.isfile(caddyfile):
                     return jsonify({"success": False, "error": f"Caddyfile '{caddyfile}' does not exist."}), 400
 
                 config.update({
-                    "base_dir": base_dir,
                     "caddyfile": caddyfile,
                     "port": int(port),
                     "first_run": False,

@@ -1,5 +1,4 @@
 {
-    "base_dir": "",
     "caddyfile": "",
     "port": 5154,
     "first_run": true

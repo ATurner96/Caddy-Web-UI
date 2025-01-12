@@ -13,15 +13,6 @@
         <h1>Configuration Settings</h1>
         <form id="config-form">
             <div class="mb-3">
-                <label for="base_dir" class="form-label">Base Directory</label>
-                <div class="input-group">
-                    <input type="text" id="base_dir" class="form-control" placeholder="/var/www/caddy-web-ui" readonly>
-                    <button type="button" id="browse-base-dir-btn" class="btn btn-outline-secondary">Browse</button>
-                </div>
-                <small class="form-text text-muted">Select the directory where the application is installed.</small>
-            </div>
-
-            <div class="mb-3">
                 <label for="caddyfile" class="form-label">Caddyfile Path</label>
                 <div class="input-group">
                     <input type="text" id="caddyfile" class="form-control" placeholder="/etc/caddy/Caddyfile" readonly>
@@ -61,10 +52,8 @@
         </div>
     </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js"></script>
-
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.min.js"></script>
-
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.min.js"></script>
 
     <script>
         let currentPath = "/";
@@ -72,11 +61,10 @@
 
         function normalisePath(path) {
             if (!path || typeof path !== "string") {
-                return "/"; // Default to root
+                return "/";
             }
-            // Replace backslashes, remove duplicate slashes, and ensure it always starts with a single /
             const normalised = path.replace(/\\/g, '/').replace(/\/+/g, '/');
-            return normalised === "" ? "/" : normalised; // Ensure root is always "/"
+            return normalised === "" ? "/" : normalised;
         }
 
         function renderRootFileExplorer(path = null) {
@@ -92,7 +80,6 @@
                         fileExplorer.innerHTML = "";
                         breadcrumb.innerHTML = "";
 
-                        // Breadcrumb navigation
                         const pathParts = normalisedPath.split('/').filter(Boolean);
                         let accumulatedPath = "/";
                         pathParts.forEach((part, index) => {
@@ -112,7 +99,6 @@
                             breadcrumb.appendChild(breadcrumbItem);
                         });
 
-                        // File listing
                         data.files.forEach(file => {
                             const item = document.createElement("div");
                             item.classList.add("file-item", "d-flex", "align-items-center", "mb-2");
@@ -131,7 +117,6 @@
                                     renderRootFileExplorer(selectedPath);
                                 } else {
                                     selectedPath = normalisePath(`${normalisedPath}/${file.name}`);
-                                    console.log("File selected:", selectedPath); // Debugging
                                 }
                             };
                             item.appendChild(name);
@@ -145,23 +130,6 @@
                 .catch(error => console.error("Error fetching files:", error));
         }
 
-        document.getElementById("browse-base-dir-btn").addEventListener("click", () => {
-            currentPath = null;
-            selectedPath = "";
-            renderRootFileExplorer(currentPath);
-
-            document.getElementById("select-btn").onclick = () => {
-                if (selectedPath) {
-                    document.getElementById("base_dir").value = selectedPath; // Use the updated selectedPath
-                } else {
-                    alert("Please select a directory.");
-                }
-                bootstrap.Modal.getInstance(document.getElementById("fileManagerModal")).hide();
-            };
-
-            new bootstrap.Modal(document.getElementById("fileManagerModal")).show();
-        });
-
         document.getElementById("browse-caddyfile-btn").addEventListener("click", () => {
             currentPath = null;
             selectedPath = "";
@@ -169,7 +137,7 @@
 
             document.getElementById("select-btn").onclick = () => {
                 if (selectedPath) {
-                    document.getElementById("caddyfile").value = selectedPath; // Use the updated selectedPath
+                    document.getElementById("caddyfile").value = selectedPath;
                 } else {
                     alert("Please select a file.");
                 }
@@ -181,14 +149,13 @@
 
         document.getElementById("config-form").addEventListener("submit", (e) => {
             e.preventDefault();
-            const baseDir = document.getElementById("base_dir").value || null;
             const caddyfile = document.getElementById("caddyfile").value || null;
             const port = document.getElementById("port").value || 5154;
 
             fetch("/setup", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ base_dir: baseDir, caddyfile, port }),
+                body: JSON.stringify({ caddyfile, port }),
             })
                 .then(response => response.json())
                 .then(data => {
