@@ -250,8 +250,12 @@ def create_app():
             if not root_dir:
                 return jsonify({"success": False, "error": "No root directory configured"}), 400
 
-            full_path = os.path.join(root_dir, relative_path)
+            full_path = os.path.normpath(os.path.join(root_dir, relative_path))
+            print(f"DEBUG: Full path: {full_path}")
             
+            if not os.path.exists(full_path):
+                os.makedirs(full_path)
+                
             items = []
             for entry in os.scandir(full_path):
                 items.append({
