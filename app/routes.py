@@ -6,7 +6,7 @@ from flask import request, jsonify, render_template, redirect, session, send_fro
 from app.utils import parse_caddyfile, update_caddyfile
 from functools import wraps
 import shutil
-import secrets  # For generating a secure secret key
+import secrets
 import app
 import platform
 
@@ -15,7 +15,6 @@ USERS_FILE = os.path.join("app", "config", "users.json")
 CONFIG_FILE = os.path.join("app", "config", "config.json")
 UPLOAD_DIR = "/var/www/caddy-sites"
 
-# Load the configuration
 if not os.path.exists(CONFIG_FILE):
     with open(CONFIG_FILE, "w") as file:
         json.dump({"first_run": True}, file)
@@ -23,13 +22,11 @@ if not os.path.exists(CONFIG_FILE):
 with open(CONFIG_FILE) as file:
     config = json.load(file)
 
-# Generate a secure session key if not already set
 if "secret_key" not in config:
     config["secret_key"] = secrets.token_hex(32)
     with open(CONFIG_FILE, "w") as file:
         json.dump(config, file, indent=4)
 
-# Flask app secret key
 app.secret_key = config["secret_key"]
 
 def load_users():
@@ -43,6 +40,15 @@ def save_users(users):
     """Save users to the JSON file."""
     with open(USERS_FILE, "w") as file:
         json.dump(users, file)
+
+def get_site_root_dir(config):
+    """Extract root directory from site config."""
+    for line in config:
+        if "root" in line:
+            parts = line.strip().split()
+            if len(parts) >= 2:
+                return os.path.expanduser(parts[1])
+    return None
 
 users = load_users()
 
@@ -71,16 +77,13 @@ def create_routes(app):
         print(f"Session Username: {session.get('username')}")
 
         if config.get("first_run", True):
-            # Allow specific endpoints during setup
             allowed_endpoints = {"setup", "static", "list-root-directories"}
             if request.endpoint not in allowed_endpoints:
-                # Allow authenticated users to access other endpoints
                 if "username" not in session:
                     print("Redirecting to /setup")
                     return redirect("/setup")
-            return  # Prevent further processing for allowed endpoints
+            return
 
-        # Enforce login for all other routes after setup
         if "username" not in session and request.endpoint not in {"login", "static", "list-root-directories"}:
             print("Redirecting to /login")
             return redirect("/login")
@@ -95,11 +98,9 @@ def create_routes(app):
         with open(config_path, "w") as config_file:
             json.dump(config, config_file, indent=4)
 
-    # Setup Route
     @app.route("/setup", methods=["GET", "POST"])
     def setup():
         """Initial setup to create the first user and configure settings."""
-        # Stage 1: Create Admin User
         if not users:
             if request.method == "POST":
                 data = request.json
@@ -109,18 +110,15 @@ def create_routes(app):
                 if not username or not password:
                     return jsonify({"success": False, "error": "Username and password are required"}), 400
 
-                # Hash the password and save the user
                 hashed_password = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
                 users[username] = hashed_password
                 save_users(users)
 
-                # Create session for the user
                 session["username"] = username
                 return jsonify({"success": True, "message": "User created successfully. Session started."})
 
             return render_template("setup_user.html")
 
-        # Stage 2: Configure Settings
         if config.get("first_run", True):
             if request.method == "POST":
                 data = request.json
@@ -128,17 +126,14 @@ def create_routes(app):
                 caddyfile = data.get("caddyfile") or (r"C:\Caddy\Caddyfile" if platform.system() == "Windows" else "/etc/caddy/Caddyfile")
                 port = data.get("port") or 5154
 
-                # Normalize paths
                 base_dir = os.path.normpath(base_dir)
                 caddyfile = os.path.normpath(caddyfile)
 
-                # Validate paths
                 if not os.path.exists(base_dir):
                     return jsonify({"success": False, "error": f"Base directory '{base_dir}' does not exist."}), 400
                 if not os.path.isfile(caddyfile):
                     return jsonify({"success": False, "error": f"Caddyfile '{caddyfile}' does not exist."}), 400
 
-                # Update configuration
                 config.update({
                     "base_dir": base_dir,
                     "caddyfile": caddyfile,
@@ -153,7 +148,6 @@ def create_routes(app):
 
             return render_template("setup_config.html")
 
-        # If setup is complete, redirect to home
         return redirect("/")
 
     @app.route("/login", methods=["GET", "POST"])
@@ -325,24 +319,34 @@ def create_routes(app):
     @app.route("/upload/<path:site_path>", methods=["POST"])
     @login_required
     def upload_file(site_path):
+        sites = parse_caddyfile(CADDYFILE)
         parts = site_path.split("/", 1)
         domain = parts[0]
         relative_path = parts[1] if len(parts) > 1 else ""
 
-        full_path = os.path.join(UPLOAD_DIR, domain, relative_path)
+        site = next((s for s in sites if s["domain"] == domain), None)
+        if not site:
+            return jsonify({"success": False, "error": "Site not found"}), 404
+
+        root_dir = get_site_root_dir(site["config"])
+        if not root_dir:
+            return jsonify({"success": False, "error": "No root directory configured for site"}), 400
+
+        full_path = os.path.join(root_dir, relative_path)
         full_path = os.path.normpath(full_path)
 
-        os.makedirs(full_path, exist_ok=True)
+        if not os.path.exists(full_path):
+            os.makedirs(full_path)
 
         if "files" not in request.files:
-            return jsonify({"success": False, "error": "No files part in the request"}), 400
+            return jsonify({"success": False, "error": "No files in request"}), 400
 
         files = request.files.getlist("files")
         for file in files:
             if file.filename:
                 file.save(os.path.join(full_path, file.filename))
 
-        return jsonify({"success": True, "message": "Files uploaded successfully!", "path": relative_path})
+        return jsonify({"success": True, "message": "Files uploaded successfully!"})
 
     @app.route("/upload-zip/<path:site_path>", methods=["POST"])
     @login_required
@@ -378,23 +382,26 @@ def create_routes(app):
     @app.route("/delete-file/<path:site_path>", methods=["DELETE"])
     @login_required
     def delete_file(site_path):
+        sites = parse_caddyfile(CADDYFILE)
         parts = site_path.split("/", 1)
         domain = parts[0]
         relative_path = parts[1] if len(parts) > 1 else ""
 
-        file_path = os.path.normpath(os.path.join(UPLOAD_DIR, domain, relative_path))
+        site = next((s for s in sites if s["domain"] == domain), None)
+        if not site:
+            return jsonify({"success": False, "error": "Site not found"}), 404
 
-        print(f"DEBUG: Deleting file at path: {file_path}")
+        root_dir = get_site_root_dir(site["config"])
+        if not root_dir:
+            return jsonify({"success": False, "error": "No root directory configured for site"}), 400
 
-        if not os.path.exists(file_path):
-            return jsonify({"success": False, "error": f"File not found: {file_path}"}), 404
+        file_path = os.path.normpath(os.path.join(root_dir, relative_path))
 
         try:
             if os.path.isdir(file_path):
                 shutil.rmtree(file_path)
             else:
                 os.remove(file_path)
-
             return jsonify({"success": True, "message": "Deleted successfully!"})
         except Exception as e:
             return jsonify({"success": False, "error": str(e)}), 500
@@ -416,22 +423,29 @@ def create_routes(app):
     @app.route("/list-files/<path:site_path>", methods=["GET"])
     @login_required
     def list_files(site_path):
-        """List files and directories in the specified site path."""
-        site_dir = os.path.join(UPLOAD_DIR, site_path)
+        sites = parse_caddyfile(CADDYFILE)
+        domain = site_path.split('/')[0]
+        relative_path = '/'.join(site_path.split('/')[1:])
 
-        if not os.path.exists(site_dir):
-            return jsonify({"success": False, "error": f"Directory '{site_dir}' does not exist"}), 404
+        site = next((s for s in sites if s["domain"] == domain), None)
+        if not site:
+            return jsonify({"success": False, "error": "Site not found"}), 404
 
+        root_dir = get_site_root_dir(site["config"])
+        if not root_dir:
+            return jsonify({"success": False, "error": "No root directory configured for site"}), 400
+
+        full_path = os.path.join(root_dir, relative_path)
+        
         try:
             items = []
-            for entry in os.scandir(site_dir):
+            for entry in os.scandir(full_path):
                 items.append({
                     "name": entry.name,
                     "type": "directory" if entry.is_dir() else "file",
                     "size": os.path.getsize(entry) if not entry.is_dir() else "-",
                     "modified": os.path.getmtime(entry),
                 })
-
             return jsonify({"success": True, "files": items})
         except Exception as e:
             return jsonify({"success": False, "error": str(e)}), 500
@@ -444,7 +458,6 @@ def create_routes(app):
 
         try:
             if root_path:
-                # List contents of the provided directory
                 if not os.path.exists(root_path):
                     return jsonify({"success": False, "error": f"Path '{root_path}' does not exist"}), 404
                 
@@ -459,13 +472,10 @@ def create_routes(app):
 
                 return jsonify({"success": True, "path": root_path, "files": items})
             else:
-                # List root directories
                 if platform.system() == "Windows":
-                    # On Windows, root directories are the drives
                     drives = [f"{chr(d)}:\\" for d in range(65, 91) if os.path.exists(f"{chr(d)}:\\")]
                     return jsonify({"success": True, "path": "root", "files": [{"name": drive, "type": "directory"} for drive in drives]})
                 else:
-                    # On Unix-like systems, the root directory is "/"
                     return jsonify({"success": True, "path": "root", "files": [{"name": "/", "type": "directory"}]})
         except Exception as e:
             return jsonify({"success": False, "error": str(e)}), 500
