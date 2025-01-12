@@ -1,6 +1,7 @@
 import json
 from flask import Flask
 from app.routes import create_routes
+from app.routes import app
 
 
 with open("app/config/config.json") as config_file:

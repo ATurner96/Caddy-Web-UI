@@ -2,32 +2,17 @@ import os
 import json
 import bcrypt
 import zipfile
-from flask import request, jsonify, render_template, redirect, session, send_from_directory
+from flask import Flask, request, jsonify, render_template, redirect, session, send_from_directory
 from app.utils import parse_caddyfile, update_caddyfile
 from functools import wraps
 import shutil
 import secrets
-import app
 import platform
 
+app = Flask(__name__)
 
 USERS_FILE = os.path.join("app", "config", "users.json")
 CONFIG_FILE = os.path.join("app", "config", "config.json")
-UPLOAD_DIR = "/var/www/caddy-sites"
-
-if not os.path.exists(CONFIG_FILE):
-    with open(CONFIG_FILE, "w") as file:
-        json.dump({"first_run": True}, file)
-
-with open(CONFIG_FILE) as file:
-    config = json.load(file)
-
-if "secret_key" not in config:
-    config["secret_key"] = secrets.token_hex(32)
-    with open(CONFIG_FILE, "w") as file:
-        json.dump(config, file, indent=4)
-
-app.secret_key = config["secret_key"]
 
 def reload_config():
     """Reload configuration from file."""
@@ -46,6 +31,20 @@ def before_request():
             return redirect("/setup")
     elif "username" not in session and request.endpoint not in {"login", "static", "list-root-directories"}:
         return redirect("/login")
+
+if not os.path.exists(CONFIG_FILE):
+    with open(CONFIG_FILE, "w") as file:
+        json.dump({"first_run": True}, file)
+
+with open(CONFIG_FILE) as file:
+    config = json.load(file)
+
+if "secret_key" not in config:
+    config["secret_key"] = secrets.token_hex(32)
+    with open(CONFIG_FILE, "w") as file:
+        json.dump(config, file, indent=4)
+
+app.secret_key = config["secret_key"]
 
 def load_users():
     """Load users from the JSON file."""
