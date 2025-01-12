@@ -65,7 +65,6 @@ def create_routes(app):
     with open(config_path) as config_file:
         config = json.load(config_file)
     
-    BASE_DIR = config["base_dir"]
     CADDYFILE = config["caddyfile"]
 
     @app.before_request
