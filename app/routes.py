@@ -147,13 +147,14 @@ def create_app():
     def logout():
         session.pop("username", None)
         return redirect("/login")
+    
 
     @app.route("/")
     @login_required
     def home():
         try:
             sites = parse_caddyfile(app.config['CADDYFILE'])
-            return render_template("index.html", sites=sites)
+            return render_template("index.html", sites=sites, get_site_root_dir=get_site_root_dir)
         except Exception as e:
             return jsonify({"success": False, "error": str(e)}), 500
 
