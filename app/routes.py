@@ -48,15 +48,14 @@ def create_app():
             return redirect("/login")
         
     def get_site_root_dir(config):
-        print(f"DEBUG: Config input: {config}")
+        logger.debug(f"Parsing config for root: {config}")
         for line in config:
             if line.strip().startswith('root'):
                 parts = line.strip().split()
-                if len(parts) >= 2:
-                    path = parts[1].strip('"\'')
-                    print(f"DEBUG: Found root path: {path}")
-                    return os.path.expanduser(path)
-        print("DEBUG: No root path found in config")
+                if len(parts) >= 3:
+                    path = parts[2].strip('"\'/')
+                    logger.debug(f"Found root path: {path}")
+                    return path
         return None
 
     def load_users():
