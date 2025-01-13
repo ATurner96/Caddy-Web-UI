@@ -609,10 +609,14 @@ function initializeEditor(filename, content = "") {
         };
 
         function renderFileExplorer(domain, path = "") {
-            const fullPath = `${domain}/${path}`.replace(/\/\/+/g, "/");
+            const root = siteConfigs[domain].root;
+            const relativePath = path ? `/${path}` : '';
+            const fullPath = `${domain}${relativePath}`.replace(/\/\/+/g, "/");
             currentPath = fullPath;
+            console.log("Using root path:", root);
+            console.log("Full path:", fullPath);
 
-            fetch(`/list-files/${currentPath}`)
+            fetch(`/list-files/${fullPath}`)
                 .then(response => response.json())
                 .then(data => {
                     const fileExplorer = document.getElementById("file-explorer");
