@@ -242,9 +242,10 @@ def create_app():
     @app.route("/list-files/<path:site_path>", methods=["GET"])
     @login_required
     def list_files(site_path):
-        print(f"DEBUG: Current Caddyfile content: {parse_caddyfile(app.config['CADDYFILE'])}")
         try:
             sites = parse_caddyfile(app.config['CADDYFILE'])
+            print(f"DEBUG: Caddyfile: {app.config['CADDYFILE']}")
+            print(f"DEBUG: Sites: {sites}")
             domain = site_path.split('/')[0]
             relative_path = '/'.join(site_path.split('/')[1:])
 
