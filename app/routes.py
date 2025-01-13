@@ -44,13 +44,15 @@ def create_app():
             return redirect("/login")
         
     def get_site_root_dir(config):
+        print(f"DEBUG: Config input: {config}")
         for line in config:
             if line.strip().startswith('root'):
                 parts = line.strip().split()
                 if len(parts) >= 2:
-                    # Remove any quotes around the path
                     path = parts[1].strip('"\'')
+                    print(f"DEBUG: Found root path: {path}")
                     return os.path.expanduser(path)
+        print("DEBUG: No root path found in config")
         return None
 
     def load_users():
@@ -62,14 +64,6 @@ def create_app():
     def save_users(users):
         with open(USERS_FILE, "w") as file:
             json.dump(users, file)
-
-    def get_site_root_dir(config):
-        for line in config:
-            if "root" in line:
-                parts = line.strip().split()
-                if len(parts) >= 2:
-                    return os.path.expanduser(parts[1])
-        return None
 
     users = load_users()
 
