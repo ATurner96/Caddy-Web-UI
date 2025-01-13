@@ -53,7 +53,7 @@ def create_app():
             if line.strip().startswith('root'):
                 parts = line.strip().split()
                 if len(parts) >= 3:
-                    path = parts[2].strip('"\'/')
+                    path = parts[2].rstrip('/')
                     logger.debug(f"Found root path: {path}")
                     return path
         return None
