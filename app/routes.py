@@ -8,9 +8,13 @@ from functools import wraps
 import shutil
 import secrets
 import platform
+import logging
 
 USERS_FILE = os.path.join("app", "config", "users.json")
 CONFIG_FILE = os.path.join("app", "config", "config.json")
+
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 def create_app():
     app = Flask(__name__)
@@ -243,12 +247,9 @@ def create_app():
     @login_required
     def list_files(site_path):
         try:
-            print(f"DEBUG: Caddyfile path: {app.config['CADDYFILE']}")
-            with open(app.config['CADDYFILE'], 'r') as f:
-                print(f"DEBUG: Raw Caddyfile content: {f.read()}")
-            
+            logger.debug(f"Caddyfile path: {app.config['CADDYFILE']}")
             sites = parse_caddyfile(app.config['CADDYFILE'])
-            print(f"DEBUG: Parsed sites: {sites}")
+            logger.debug(f"Parsed sites: {sites}")
             
             domain = site_path.split('/')[0]
             print(f"DEBUG: Looking for domain: {domain}")
