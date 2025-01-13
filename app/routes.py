@@ -213,26 +213,30 @@ def create_app():
         try:
             data = request.json
             domain = data["domain"]
-            new_config = data["config"]
-
+            new_config = data.get("config", "").split('\n') if isinstance(data.get("config"), str) else data["config"]
+            
+            logger.debug(f"Editing site {domain} with new config: {new_config}")
             sites = parse_caddyfile(app.config['CADDYFILE'])
+            
             for site in sites:
                 if site["domain"] == domain:
                     old_root = get_site_root_dir(site["config"])
                     new_root = get_site_root_dir(new_config)
-                    
+                    logger.debug(f"Old root: {old_root}, New root: {new_root}")
+
                     if old_root != new_root and new_root:
                         if os.path.exists(old_root):
+                            logger.debug(f"Moving files from {old_root} to {new_root}")
                             os.makedirs(new_root, exist_ok=True)
                             for item in os.listdir(old_root):
-                                s = os.path.join(old_root, item)
-                                d = os.path.join(new_root, item)
-                                if os.path.isdir(s):
-                                    shutil.copytree(s, d)
+                                src = os.path.join(old_root, item)
+                                dst = os.path.join(new_root, item)
+                                if os.path.isdir(src):
+                                    shutil.copytree(src, dst)
                                 else:
-                                    shutil.copy2(s, d)
+                                    shutil.copy2(src, dst)
                             shutil.rmtree(old_root)
-
+                    
                     site["config"] = new_config
                     break
 
@@ -240,6 +244,7 @@ def create_app():
             os.system(f"caddy reload --config {app.config['CADDYFILE']}")
             return jsonify({"success": True})
         except Exception as e:
+            logger.error(f"Error editing site: {str(e)}")
             return jsonify({"success": False, "error": str(e)}), 500
 
     @app.route("/list-files/<path:site_path>", methods=["GET"])
