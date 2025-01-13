@@ -37,7 +37,7 @@
                 <button class="btn btn-primary edit-site-btn" data-domain="{{ site.domain }}" data-config="{{ site.config | join('\n') }}">Edit</button>
                 <button class="btn btn-danger delete-site-btn" data-domain="{{ site.domain }}">Delete</button>
                 {% if 'file_server' in site.config %}
-                <button class="btn btn-secondary upload-btn" data-domain="{{ site.domain }}">Manage Files</button>
+                <button class="btn btn-secondary upload-btn" data-domain="{{ site.domain }}" data-root="{{ get_site_root_dir(site.config) }}">Manage Files</button>
                 {% endif %}
             </li>
             {% endfor %}
@@ -602,12 +602,11 @@ function initializeEditor(filename, content = "") {
 
 
         function renderFileExplorer(domain, path = "") {
-            const normalizedPath = path.startsWith(domain)
-                ? path.replace(`${domain}/`, "")
-                : path;
-
-            currentPath = `${domain}/${normalizedPath}`.replace(/\/\/+/g, "/");
-            console.log("Normalized renderFileExplorer path:", currentPath);
+            const root_dir = get_site_root_dir(domain);
+            const fullPath = `${root_dir}/${path}`.replace(/\/\/+/g, "/");
+            currentPath = fullPath;
+            
+            console.log("Full path:", fullPath);
 
             fetch(`/list-files/${currentPath}`)
                 .then(response => response.json())
