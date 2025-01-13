@@ -294,6 +294,68 @@ def create_app():
         except Exception as e:
             logger.error(f"Error listing files: {str(e)}")
             return jsonify({"success": False, "error": str(e)}), 500
+        
+
+    @app.route("/edit-file/<path:site_path>/<filename>", methods=["GET"])
+    @login_required
+    def get_file_content(site_path, filename):
+        """Fetch the content of a file."""
+        try:
+            sites = parse_caddyfile(app.config['CADDYFILE'])
+            domain = site_path.split('/')[0]
+            
+            site = next((s for s in sites if s["domain"] == domain), None)
+            if not site:
+                return jsonify({"success": False, "error": "Site not found"}), 404
+
+            root_dir = get_site_root_dir(site["config"])
+            if not root_dir:
+                return jsonify({"success": False, "error": "No root directory configured"}), 400
+
+            file_path = os.path.join(root_dir, filename)
+            logger.debug(f"Attempting to read file: {file_path}")
+
+            if not os.path.exists(file_path):
+                logger.error(f"File not found: {file_path}")
+                return jsonify({"success": False, "error": "File not found"}), 404
+
+            with open(file_path, "r", encoding="utf-8") as file:
+                content = file.read()
+            return jsonify({"success": True, "content": content})
+        except Exception as e:
+            logger.error(f"Error in get_file_content: {str(e)}")
+            return jsonify({"success": False, "error": str(e)}), 500
+
+    @app.route("/save-file/<path:site_path>/<filename>", methods=["POST"])
+    @login_required
+    def save_file_content(site_path, filename):
+        """Save updated file content."""
+        try:
+            sites = parse_caddyfile(app.config['CADDYFILE'])
+            domain = site_path.split('/')[0]
+            
+            site = next((s for s in sites if s["domain"] == domain), None)
+            if not site:
+                return jsonify({"success": False, "error": "Site not found"}), 404
+
+            root_dir = get_site_root_dir(site["config"])
+            if not root_dir:
+                return jsonify({"success": False, "error": "No root directory configured"}), 400
+
+            file_path = os.path.join(root_dir, filename)
+            logger.debug(f"Saving to file: {file_path}")
+
+            if not os.path.exists(os.path.dirname(file_path)):
+                os.makedirs(os.path.dirname(file_path))
+
+            content = request.json.get("content", "")
+            with open(file_path, "w", encoding="utf-8") as file:
+                file.write(content)
+            return jsonify({"success": True, "message": "File saved successfully!"})
+        except Exception as e:
+            logger.error(f"Error in save_file_content: {str(e)}")
+            return jsonify({"success": False, "error": str(e)}), 500
+
 
     @app.route("/upload/<path:site_path>", methods=["POST"])
     @login_required

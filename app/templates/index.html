@@ -365,8 +365,6 @@
         });
 
         function openEditFileModal(domain, path) {
-            const root = siteConfigs[domain].root;
-            console.log("Editing file in root:", root);
             fetch(`/edit-file/${domain}${path}`)
                 .then((response) => response.json())
                 .then((data) => {
@@ -690,8 +688,8 @@ function initializeEditor(filename, content = "") {
                                 const editBtn = document.createElement("button");
                                 editBtn.textContent = "Edit";
                                 editBtn.classList.add("btn", "btn-sm", "btn-outline-info", "me-2");
-                                editBtn.setAttribute("data-root", siteConfigs[domain].root);
-                                editBtn.onclick = () => openEditFileModal(domain, `${path}/${file.name}`);
+                                const filePath = `${path}/${file.name}`.replace(/^\/+/, '');  // Remove leading slashes
+                                editBtn.onclick = () => openEditFileModal(domain, filePath);
                                 item.appendChild(editBtn);
                             }
 
