@@ -365,56 +365,58 @@
         });
 
         function openEditFileModal(domain, path) {
-    fetch(`/edit-file/${domain}${path}`)
-        .then((response) => response.json())
-        .then((data) => {
-            if (data.success) {
-                const content = data.content;
-                const filename = path.split('/').pop();
+            const root = siteConfigs[domain].root;
+            console.log("Editing file in root:", root);
+            fetch(`/edit-file/${domain}${path}`)
+                .then((response) => response.json())
+                .then((data) => {
+                    if (data.success) {
+                        const content = data.content;
+                        const filename = path.split('/').pop();
 
-                const modalElement = document.getElementById("editFileModal");
-                const modal = new bootstrap.Modal(modalElement);
+                        const modalElement = document.getElementById("editFileModal");
+                        const modal = new bootstrap.Modal(modalElement);
 
-                modalElement.addEventListener("shown.bs.modal", () => {
-                    const editorContainer = document.getElementById("monaco-editor");
-                    if (!editorContainer) {
-                        console.error("Monaco container element not found.");
-                        return;
+                        modalElement.addEventListener("shown.bs.modal", () => {
+                            const editorContainer = document.getElementById("monaco-editor");
+                            if (!editorContainer) {
+                                console.error("Monaco container element not found.");
+                                return;
+                            }
+
+                            require.config({ paths: { vs: "https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.33.0/min/vs" } });
+                            require(["vs/editor/editor.main"], () => {
+                                initializeEditor(filename, content);
+                            });
+
+                            const saveButton = document.getElementById("save-file-btn");
+                            saveButton.onclick = () => {
+                                const newContent = monacoEditor.getValue();
+                                fetch(`/save-file/${domain}${path}`, {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({ content: newContent }),
+                                })
+                                    .then((response) => response.json())
+                                    .then((data) => {
+                                        if (data.success) {
+                                            modal.hide();
+                                            alert("File saved successfully!");
+                                        } else {
+                                            alert(data.error || "Failed to save the file.");
+                                        }
+                                    })
+                                    .catch((error) => console.error("Error saving file:", error));
+                            };
+                        });
+
+                        modal.show();
+                    } else {
+                        alert(data.error || "Failed to fetch file content.");
                     }
-
-                    require.config({ paths: { vs: "https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.33.0/min/vs" } });
-                    require(["vs/editor/editor.main"], () => {
-                        initializeEditor(filename, content);
-                    });
-
-                    const saveButton = document.getElementById("save-file-btn");
-                    saveButton.onclick = () => {
-                        const newContent = monacoEditor.getValue();
-                        fetch(`/save-file/${domain}${path}`, {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ content: newContent }),
-                        })
-                            .then((response) => response.json())
-                            .then((data) => {
-                                if (data.success) {
-                                    modal.hide();
-                                    alert("File saved successfully!");
-                                } else {
-                                    alert(data.error || "Failed to save the file.");
-                                }
-                            })
-                            .catch((error) => console.error("Error saving file:", error));
-                    };
-                });
-
-                modal.show();
-            } else {
-                alert(data.error || "Failed to fetch file content.");
-            }
-        })
-        .catch((error) => console.error("Error fetching file content:", error));
-}
+                })
+                .catch((error) => console.error("Error fetching file content:", error));
+        }
 
 function initializeEditor(filename, content = "") {
     const determineLanguage = (filename) => {
@@ -688,6 +690,7 @@ function initializeEditor(filename, content = "") {
                                 const editBtn = document.createElement("button");
                                 editBtn.textContent = "Edit";
                                 editBtn.classList.add("btn", "btn-sm", "btn-outline-info", "me-2");
+                                editBtn.setAttribute("data-root", siteConfigs[domain].root);
                                 editBtn.onclick = () => openEditFileModal(domain, `${path}/${file.name}`);
                                 item.appendChild(editBtn);
                             }
