@@ -252,22 +252,29 @@ def create_app():
             logger.debug(f"Parsed sites: {sites}")
             
             domain = site_path.split('/')[0]
-            print(f"DEBUG: Looking for domain: {domain}")
+            logger.debug(f"Looking for domain: {domain}")
             relative_path = '/'.join(site_path.split('/')[1:])
+            logger.debug(f"Relative path: {relative_path}")
 
             site = next((s for s in sites if s["domain"] == domain), None)
             if not site:
+                logger.error(f"Site not found for domain: {domain}")
                 return jsonify({"success": False, "error": "Site not found"}), 404
 
+            logger.debug(f"Found site config: {site}")
             root_dir = get_site_root_dir(site["config"])
             if not root_dir:
+                logger.error("No root directory configured in site config")
                 return jsonify({"success": False, "error": "No root directory configured"}), 400
 
+            logger.debug(f"Root directory: {root_dir}")
             target_path = os.path.join(root_dir, relative_path)
             target_path = os.path.normpath(target_path)
-            print(f"DEBUG: Accessing path: {target_path}")
+            logger.debug(f"Target path: {target_path}")
+            logger.debug(f"Path exists: {os.path.exists(target_path)}")
 
             if not os.path.exists(target_path):
+                logger.debug(f"Creating directory: {target_path}")
                 os.makedirs(target_path)
 
             items = []
@@ -278,9 +285,10 @@ def create_app():
                     "size": os.path.getsize(entry) if not entry.is_dir() else "-",
                     "modified": os.path.getmtime(entry),
                 })
+            logger.debug(f"Found items: {items}")
             return jsonify({"success": True, "files": items})
         except Exception as e:
-            print(f"DEBUG: Error listing files: {str(e)}")
+            logger.error(f"Error listing files: {str(e)}")
             return jsonify({"success": False, "error": str(e)}), 500
 
     @app.route("/upload/<path:site_path>", methods=["POST"])
