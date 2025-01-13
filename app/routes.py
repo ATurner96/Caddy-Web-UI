@@ -42,6 +42,16 @@ def create_app():
                 return redirect("/setup")
         elif "username" not in session and request.endpoint not in {"login", "static", "list-root-directories"}:
             return redirect("/login")
+        
+    def get_site_root_dir(config):
+        for line in config:
+            if line.strip().startswith('root'):
+                parts = line.strip().split()
+                if len(parts) >= 2:
+                    # Remove any quotes around the path
+                    path = parts[1].strip('"\'')
+                    return os.path.expanduser(path)
+        return None
 
     def load_users():
         if not os.path.exists(USERS_FILE):
@@ -250,14 +260,15 @@ def create_app():
             if not root_dir:
                 return jsonify({"success": False, "error": "No root directory configured"}), 400
 
-            full_path = os.path.normpath(os.path.join(root_dir, relative_path))
-            print(f"DEBUG: Full path: {full_path}")
-            
-            if not os.path.exists(full_path):
-                os.makedirs(full_path)
-                
+            target_path = os.path.join(root_dir, relative_path)
+            target_path = os.path.normpath(target_path)
+            print(f"DEBUG: Accessing path: {target_path}")
+
+            if not os.path.exists(target_path):
+                os.makedirs(target_path)
+
             items = []
-            for entry in os.scandir(full_path):
+            for entry in os.scandir(target_path):
                 items.append({
                     "name": entry.name,
                     "type": "directory" if entry.is_dir() else "file",
@@ -266,6 +277,7 @@ def create_app():
                 })
             return jsonify({"success": True, "files": items})
         except Exception as e:
+            print(f"DEBUG: Error listing files: {str(e)}")
             return jsonify({"success": False, "error": str(e)}), 500
 
     @app.route("/upload/<path:site_path>", methods=["POST"])
@@ -333,6 +345,29 @@ def create_app():
                 return jsonify({"success": True, "message": "ZIP extracted successfully"})
             except zipfile.BadZipFile:
                 return jsonify({"success": False, "error": "Invalid ZIP file"}), 400
+        except Exception as e:
+            return jsonify({"success": False, "error": str(e)}), 500
+        
+    @app.route("/create-dir/<path:site_path>/<dirname>", methods=["POST"])
+    @login_required
+    def create_directory(site_path, dirname):
+        try:
+            sites = parse_caddyfile(app.config['CADDYFILE'])
+            domain = site_path.split('/')[0]
+
+            site = next((s for s in sites if s["domain"] == domain), None)
+            if not site:
+                return jsonify({"success": False, "error": "Site not found"}), 404
+
+            root_dir = get_site_root_dir(site["config"])
+            if not root_dir:
+                return jsonify({"success": False, "error": "No root directory configured"}), 400
+
+            new_dir_path = os.path.join(root_dir, dirname)
+            new_dir_path = os.path.normpath(new_dir_path)
+            
+            os.makedirs(new_dir_path, exist_ok=True)
+            return jsonify({"success": True})
         except Exception as e:
             return jsonify({"success": False, "error": str(e)}), 500
 
