@@ -600,13 +600,17 @@ function initializeEditor(filename, content = "") {
             });
         });
 
+        const siteConfigs = {
+            {% for site in sites %}
+                "{{ site.domain }}": {
+                    root: "{{ get_site_root_dir(site.config) }}"
+                },
+            {% endfor %}
+        };
 
         function renderFileExplorer(domain, path = "") {
-            const root_dir = get_site_root_dir(domain);
-            const fullPath = `${root_dir}/${path}`.replace(/\/\/+/g, "/");
+            const fullPath = `${domain}/${path}`.replace(/\/\/+/g, "/");
             currentPath = fullPath;
-            
-            console.log("Full path:", fullPath);
 
             fetch(`/list-files/${currentPath}`)
                 .then(response => response.json())
