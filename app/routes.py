@@ -243,10 +243,15 @@ def create_app():
     @login_required
     def list_files(site_path):
         try:
+            print(f"DEBUG: Caddyfile path: {app.config['CADDYFILE']}")
+            with open(app.config['CADDYFILE'], 'r') as f:
+                print(f"DEBUG: Raw Caddyfile content: {f.read()}")
+            
             sites = parse_caddyfile(app.config['CADDYFILE'])
-            print(f"DEBUG: Caddyfile: {app.config['CADDYFILE']}")
-            print(f"DEBUG: Sites: {sites}")
+            print(f"DEBUG: Parsed sites: {sites}")
+            
             domain = site_path.split('/')[0]
+            print(f"DEBUG: Looking for domain: {domain}")
             relative_path = '/'.join(site_path.split('/')[1:])
 
             site = next((s for s in sites if s["domain"] == domain), None)
