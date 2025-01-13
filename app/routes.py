@@ -304,6 +304,8 @@ def create_app():
             sites = parse_caddyfile(app.config['CADDYFILE'])
             domain = site_path.split('/')[0]
             
+            logger.debug(f"Getting file content for domain: {domain}, filename: {filename}")
+            
             site = next((s for s in sites if s["domain"] == domain), None)
             if not site:
                 return jsonify({"success": False, "error": "Site not found"}), 404
@@ -312,7 +314,7 @@ def create_app():
             if not root_dir:
                 return jsonify({"success": False, "error": "No root directory configured"}), 400
 
-            file_path = os.path.join(root_dir, filename)
+            file_path = os.path.normpath(os.path.join(root_dir, filename))
             logger.debug(f"Attempting to read file: {file_path}")
 
             if not os.path.exists(file_path):
