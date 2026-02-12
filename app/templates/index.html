@@ -491,9 +491,11 @@ function initializeEditor(filename, content = "") {
                             const formData = new FormData();
                             formData.append("zip", files[0]);
 
-                            const relativePath = currentPath.startsWith(`${domain}/`)
-                                ? currentPath.replace(`${domain}/`, "")
-                                : currentPath;
+                            const relativePath = (currentPath === domain)
+                                ? ""
+                                : currentPath.startsWith(`${domain}/`)
+                                    ? currentPath.replace(`${domain}/`, "")
+                                    : currentPath;
 
                             fetch(`/upload-zip/${domain}/${relativePath}`, {
                                 method: "POST",
@@ -524,9 +526,11 @@ function initializeEditor(filename, content = "") {
                             formData.append("files", file);
                         }
 
-                        const relativePath = currentPath.startsWith(`${domain}/`)
-                            ? currentPath.replace(`${domain}/`, "")
-                            : currentPath;
+                        const relativePath = (currentPath === domain)
+                            ? ""
+                            : currentPath.startsWith(`${domain}/`)
+                                ? currentPath.replace(`${domain}/`, "")
+                                : currentPath;
 
                         fetch(`/upload/${domain}/${relativePath}`, {
                             method: "POST",
